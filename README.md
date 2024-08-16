@@ -22,3 +22,11 @@ network = Network(
     SCALE = 400,
 )
 ```
+
+```python
+network.visualize(chess.BISHOP, chess.WHITE, 901, 0)
+```
+
+```python
+network.evaluate(chess.Board())
+```
