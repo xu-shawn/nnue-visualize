@@ -63,9 +63,11 @@ class Network:
         )
 
         offset += ft_biases_size
-        self.output_weights = self.raw[offset : offset + output_weights_size].reshape(
-            hidden_size * 2, output_bucket_count
-        ).T
+        self.output_weights = (
+            self.raw[offset : offset + output_weights_size]
+            .reshape(hidden_size * 2, output_bucket_count)
+            .T
+        )
 
         offset += output_weights_size
         self.output_bias = self.raw[offset : offset + output_bias_size]
@@ -86,6 +88,7 @@ class Network:
         color: chess.Color,
         neuron_index: int,
         king_bucket_index: int,
+        absolute_value: bool = False,
         file_name: str | None = None,
         x_label: str | None = None,
     ):
@@ -93,10 +96,18 @@ class Network:
 
         for square in chess.SQUARES:
             piece: chess.Piece = chess.Piece(piecetype, color)
-            intensity[chess.square_rank(square)][chess.square_file(square)] = (
-                self.ft_weights[king_bucket_index][
-                    self.feature_index(piece, square, chess.WHITE)
-                ][neuron_index]
+
+            neuron_intensity: int = self.ft_weights[
+                king_bucket_index,
+                self.feature_index(piece, square, chess.WHITE),
+                neuron_index,
+            ]
+
+            if absolute_value:
+                neuron_intensity = abs(neuron_intensity)
+
+            intensity[7 - chess.square_rank(square), chess.square_file(square)] = (
+                neuron_intensity
             )
 
         self.display(
@@ -161,12 +172,14 @@ class Network:
         for square, piece in board.piece_map().items():
 
             accumulators[chess.WHITE] += self.ft_weights[
-                king_bucket_indices[chess.WHITE]
-            ][self.feature_index(piece, square, chess.WHITE)]
+                king_bucket_indices[chess.WHITE],
+                self.feature_index(piece, square, chess.WHITE),
+            ]
 
             accumulators[chess.BLACK] += self.ft_weights[
-                king_bucket_indices[chess.BLACK]
-            ][self.feature_index(piece, square, chess.BLACK)]
+                king_bucket_indices[chess.BLACK],
+                self.feature_index(piece, square, chess.BLACK),
+            ]
 
         total = np.sum(
             accumulators[board.turn].clip(0, self.QA).astype(np.int32) ** 2
