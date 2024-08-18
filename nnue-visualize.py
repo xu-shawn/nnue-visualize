@@ -1,4 +1,6 @@
 import chess
+import matplotlib.axes as mpl_axes
+import matplotlib.figure as mpl_figure
 import matplotlib.pyplot as plt
 import numpy as np
 import pathlib
@@ -19,7 +21,7 @@ class Network:
         QA: int = 255,
         QB: int = 64,
         SCALE: int = 400,
-    ):
+    ) -> None:
         data: bytes = pathlib.Path(filename).read_bytes()
         self.raw: NDArray[np.int16] = np.frombuffer(data, dtype="<i2")
         self.hidden_size: int = hidden_size
@@ -46,7 +48,7 @@ class Network:
         hidden_size: int,
         king_bucket_count: int,
         output_bucket_count: int,
-    ):
+    ) -> None:
         offset: int = 0
         ft_weights_size: int = feature_size * hidden_size * king_bucket_count
         ft_biases_size: int = hidden_size
@@ -74,7 +76,7 @@ class Network:
 
     def feature_index(
         self, piece: chess.Piece, square: chess.Square, perspective: chess.Color
-    ):
+    ) -> int:
         if perspective == chess.BLACK:
             side_is_black: bool = piece.color
             square = square ^ 0b111000
@@ -89,9 +91,11 @@ class Network:
         neuron_index: int,
         king_bucket_index: int,
         absolute_value: bool = False,
+        ax: mpl_axes.Axes | None = None,
         file_name: str | None = None,
         x_label: str | None = None,
-    ):
+        **kwargs
+    ) -> None:
         intensity: NDArray[np.int32] = np.zeros((8, 8), dtype=np.int32)
 
         for square in chess.SQUARES:
@@ -110,37 +114,44 @@ class Network:
                 neuron_intensity
             )
 
-        self.display(
-            intensity,
-            file_name=file_name,
-            x_label=x_label,
-        )
+        self.display(intensity, ax=ax, file_name=file_name, x_label=x_label, **kwargs)
 
     def display(
         self,
         intensity: NDArray[np.int32],
+        ax: mpl_axes.Axes | None = None,
         file_name: str | None = None,
         x_label: str | None = None,
-    ):
+        cmap: str = "magma",
+        interpolation: str = "none",
+        **kwargs
+    ) -> None:
+        fig: mpl_figure.Figure | None = None
 
-        fig, ax = plt.subplots(figsize=(2, 2))
-        ax.imshow(intensity, cmap="magma", interpolation="none")
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(2, 2))
+            ax.get_xaxis().set_visible(False)
+            ax.get_yaxis().set_visible(False)
+
+        ax.imshow(intensity, cmap=cmap, interpolation=interpolation, **kwargs)
 
         if x_label:
             ax.set_xlabel(x_label)
 
-        ax.set_xticks([])
-        ax.set_yticks([])
+        if not file_name:
+            return
 
-        fig.tight_layout()
+        if fig is None:
+            fig = ax.get_figure()
+            if fig is None:
+                return
 
-        if file_name:
-            fig.savefig(
-                file_name,
-                pad_inches=0,
-                transparent=True,
-                dpi=1200,
-            )
+        fig.savefig(
+            file_name,
+            pad_inches=0,
+            transparent=True,
+            dpi=1200,
+        )
 
     def get_king_bucket_index(self, board: chess.Board) -> tuple[int, int]:
         white_king_bucket: int = 0
@@ -160,7 +171,7 @@ class Network:
         divisor: int = (32 + self.output_bucket_count - 1) // self.output_bucket_count
         return (piece_count - 2) // divisor
 
-    def evaluate(self, board: chess.Board):
+    def evaluate(self, board: chess.Board) -> None:
         accumulators: List[NDArray[np.int16]] = [
             self.ft_biases.copy(),
             self.ft_biases.copy(),
